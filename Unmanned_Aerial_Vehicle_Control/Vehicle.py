@@ -32,32 +32,6 @@ udp_vehicle_client = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 udp_vehicle_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 udp_vehicle_server.bind((IP_vehicle,Port_vehicle))
 
-quit = False
-
-# 起飞前完成对应的检查
-def arm_check():
-    while not vehicle.armed:
-        print(" Waiting for arming...")
-        vehicle.armed = True
-        time.sleep(1)
-        
-# 起飞至预设高度(气压计检测)--千万不要在地下室尝试此功能，因为会一直往上飞。。。
-def takeoff_nogps(aTargetAltitude):
-    vehicle.mode = VehicleMode("GUIDED_NOGPS")
-    arm_check()
-    print("Taking off!")
-    thrust = DEFAULT_TAKEOFF_THRUST
-    while True:
-        current_altitude = vehicle.location.global_relative_frame.alt
-        print(" Altitude: %f  Desired: %f" % (current_altitude, aTargetAltitude))
-        if current_altitude >= aTargetAltitude*0.95 or quit:
-            print("Reached target altitude")
-            break
-        elif current_altitude >= aTargetAltitude*0.6:
-            thrust = SMOOTH_TAKEOFF_THRUST
-        set_attitude(thrust=thrust)
-        time.sleep(0.2)
-
 # 发送对应 MAVLink 消息至 Pixhawk
 def send_attitude_target(roll_angle=None,pitch_angle=None,yaw_angle=None,thrust=0.5):
     if roll_angle is None:
@@ -106,7 +80,32 @@ def to_quaternion(roll=0.0,pitch=0.0,yaw=0.0):
     z = t1 * t2 * t4 - t0 * t3 * t5
 
     return [w, x, y, z]
-    
+
+# 起飞前完成对应的检查
+def arm_check():
+    while not vehicle.armed:
+        print(" Waiting for arming...")
+        vehicle.armed = True
+        time.sleep(1)
+ 
+# 一键起飞模式
+# 起飞至预设高度(气压计检测)--千万不要在地下室尝试此功能，因为会一直往上飞。。。
+def takeoff_nogps(aTargetAltitude):
+    vehicle.mode = VehicleMode("GUIDED_NOGPS")
+    arm_check()
+    print("Taking off!")
+    thrust = DEFAULT_TAKEOFF_THRUST
+    while True:
+        current_altitude = vehicle.location.global_relative_frame.alt
+        print(" Altitude: %f  Desired: %f" % (current_altitude, aTargetAltitude))
+        if current_altitude >= aTargetAltitude*0.95:
+            print("Reached target altitude")
+            break
+        elif current_altitude >= aTargetAltitude*0.6:
+            thrust = SMOOTH_TAKEOFF_THRUST
+        set_attitude(thrust=thrust)
+        time.sleep(0.2)
+        
 # 横滚控制模式
 def roll_control(data):
     arm_check()
@@ -148,9 +147,7 @@ def down_control():
     
 # 着陆
 def land_control():
-    global quit     # 引入中断机制，防止飞机一直起飞无法降落
     print("Setting LAND mode...")
-    quit = True
     vehicle.mode = VehicleMode("LAND")
 
 # 传输视频流(通过树莓派摄像头)
